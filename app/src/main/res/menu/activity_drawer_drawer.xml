@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    tools:showIn="navigation_view">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_create_room"
+            android:title="Create Room" />
+        <item
+            android:id="@+id/nav_join_room"
+            android:title="Join Room" />
+        <item
+            android:id="@+id/nav_my_rooms"
+            android:title="My Rooms" />
+        <item
+            android:id="@+id/nav_saved_rooms"
+            android:title="My Saved Rooms" />
+
+        <item
+            android:id="@+id/nav_logout"
+            android:title="Logout" />
+    </group>
+
+    <!--<item android:title="">-->
+    <!--<menu>-->
+    <!--<item-->
+    <!--android:id="@+id/nav_share"-->
+    <!--android:title="Logout" />-->
+    <!--</menu>-->
+    <!--</item>-->
+
+</menu>

@@ -1,0 +1,63 @@
+{
+  "project_info": {
+    "project_number": "714161793275",
+    "firebase_url": "https://syla-7a22a.firebaseio.com",
+    "project_id": "syla-7a22a",
+    "storage_bucket": "syla-7a22a.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:714161793275:android:a14d24f0796728cb",
+        "android_client_info": {
+          "package_name": "com.SylaLocationApp.Syla"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "714161793275-h1ecfse136u50c34s7uqgsprqkptspvo.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.SylaLocationApp.Syla",
+            "certificate_hash": "fa0392041dff436c6174e0a547ab900870d791e8"
+          }
+        },
+        {
+          "client_id": "714161793275-6bme5qk7psldqbs8j0q3mt7vhf080pi5.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.SylaLocationApp.Syla",
+            "certificate_hash": "810a2dd329cf2be5750faad9d38f7f72d1a7b492"
+          }
+        },
+        {
+          "client_id": "714161793275-9k4bbt56cto8h31m3bukonkh4vva3lpu.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBF1fr_aP6uLEDWf-no08ba2Wiejc_h23E"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "714161793275-9k4bbt56cto8h31m3bukonkh4vva3lpu.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
