@@ -2,6 +2,8 @@ package com.syla;
 
 import android.app.AlertDialog;
 import android.app.FragmentManager;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -10,6 +12,7 @@ import android.graphics.Color;
 import android.location.Location;
 import android.net.Uri;
 import android.nfc.Tag;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -31,6 +34,7 @@ import android.view.animation.TranslateAnimation;
 import android.widget.Button;
 import android.widget.CompoundButton;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
@@ -55,7 +59,10 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -70,8 +77,19 @@ import com.syla.models.Users;
 import com.syla.utils.LocationProvider;
 import com.syla.utils.ObservableScrollView;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 public class MainActivity extends CustomActivity implements OnMapReadyCallback,
@@ -97,6 +115,8 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
     private UpdateCallbacks updateCallbacks;
     private Users admin;
     private TextView txt_group_info;
+    private TextView txt_copy_code;
+    private ImageButton btn_share_room;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -113,7 +133,7 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
 
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
-            actionBar.setDisplayHomeAsUpEnabled(true);
+            actionBar.setDisplayHomeAsUpEnabled(false);
             actionBar.setTitle("Room Name");
         }
         if (Build.VERSION.SDK_INT >= 19 && Build.VERSION.SDK_INT < 21) {
@@ -128,7 +148,7 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
         }
 
         locationProvider = new LocationProvider(getContext(), this, this);
-        MainActivity.this.locationProvider.connect();
+        locationProvider.connect();
         // restore the values from saved instance state
 //        restoreValuesFromBundle(savedInstanceState);
         mScrollView = findViewById(R.id.scroll_view);
@@ -214,15 +234,19 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
                                                 users.add(u);
                                             } else {
                                                 MyApp.popMessage("Alert", u.getName() + " has been left the room", getContext());
-                                                db.collection("allRooms").document(currentRoomId).collection("Users")
-                                                        .document(u.getUserId())
-                                                        .delete()
-                                                        .addOnSuccessListener(new OnSuccessListener<Void>() {
-                                                            @Override
-                                                            public void onSuccess(Void aVoid) {
-                                                                Log.d(TAG, "You have been removed ");
-                                                            }
-                                                        });
+                                                if (users.size() > 1) {
+                                                    db.collection("allRooms").document(currentRoomId).collection("Users")
+                                                            .document(u.getUserId())
+                                                            .delete()
+                                                            .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                                                @Override
+                                                                public void onSuccess(Void aVoid) {
+                                                                    Log.d(TAG, "You have been removed ");
+                                                                }
+                                                            });
+                                                }
+
+
                                             }
                                         } else if (u.isDeleted()) {
                                             db.collection("allRooms").document(currentRoomId).collection("Users")
@@ -274,15 +298,20 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
         updateCallbacks = new UpdateCallbacks() {
             @Override
             public void updateInvisible(final boolean isVisible) {
-                db.collection("allRooms").document(currentRoomId).collection("Users")
-                        .document(MyApp.getSharedPrefString(AppConstants.USER_ID))
-                        .update("isActive", isVisible)
-                        .addOnSuccessListener(new OnSuccessListener<Void>() {
-                            @Override
-                            public void onSuccess(Void aVoid) {
-                                Log.d(TAG, "location updated with value " + isVisible);
-                            }
-                        });
+                if (isMine) {
+
+                } else {
+                    db.collection("allRooms").document(currentRoomId).collection("Users")
+                            .document(MyApp.getSharedPrefString(AppConstants.USER_ID))
+                            .update("isActive", isVisible)
+                            .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                @Override
+                                public void onSuccess(Void aVoid) {
+                                    Log.d(TAG, "location updated with value " + isVisible);
+                                }
+                            });
+                }
+
             }
 
             @Override
@@ -487,17 +516,64 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
                 }
             }).create().show();
         } else if (v.getId() == R.id.btn_share_room) {
-            String link_val = currentRoomId;
-            String body = "Hi, I have created a room to share our location, so that we can track each other anytime" +
-                    "\n'" + link_val
-                    + "' is the room id you have to enter to join it.";
+            if (isMine) {
+                String link_val = currentRoomId;
+                String body = "Hi, I have created a room to share our location, so that we can track each other anytime" +
+                        "\n'" + link_val
+                        + "' is the room id you have to enter to join it.";
 //                            String shareBody = "Hi, I have created a room to share our location, so that we can track each other anytime" +
 //                                    "\n'" + currentRoomId + "' is the room id you have to enter to join it.";
-            Intent sharingIntent = new Intent(android.content.Intent.ACTION_SEND);
-            sharingIntent.setType("text/plain");
-            sharingIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, "Join Room");
-            sharingIntent.putExtra(android.content.Intent.EXTRA_TEXT, body);
-            startActivity(Intent.createChooser(sharingIntent, "Share Via"));
+                Intent sharingIntent = new Intent(android.content.Intent.ACTION_SEND);
+                sharingIntent.setType("text/plain");
+                sharingIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, "Join Room");
+                sharingIntent.putExtra(android.content.Intent.EXTRA_TEXT, body);
+                startActivity(Intent.createChooser(sharingIntent, "Share Via"));
+            } else {
+                AlertDialog.Builder b = new AlertDialog.Builder(getContext());
+                b.setTitle("Save Group?").setMessage("Save a group will track a record for Saved Room section, where you can" +
+                        " access your saved room anytime.\nThank you.")
+                        .setPositiveButton("Save", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                dialog.dismiss();
+                                MyApp.showMassage(getContext(), "Saving...");
+                                db.collection("allRooms").document(currentRoomId).collection("Users")
+                                        .document(MyApp.getSharedPrefString(AppConstants.USER_ID))
+                                        .update("isSaved", true)
+                                        .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                            @Override
+                                            public void onSuccess(Void aVoid) {
+                                                Log.d(TAG, "Room has been saved. ");
+                                                MyApp.showMassage(getContext(), "This room has been Saved");
+                                                db.collection("users")
+                                                        .document(MyApp.getSharedPrefString(AppConstants.USER_ID))
+                                                        .collection("savedRooms")
+                                                        .document(currentRoomId)
+                                                        .set(new HashMap<String, Object>())
+                                                        .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                                            @Override
+                                                            public void onSuccess(Void aVoid) {
+
+                                                            }
+                                                        });
+
+//                                                finish();
+                                            }
+                                        });
+                            }
+                        }).setNegativeButton("No", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.dismiss();
+                    }
+                }).create().show();
+            }
+
+        } else if (v == txt_copy_code) {
+            ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            ClipData clip = ClipData.newPlainText("Copy Code", currentRoomId);
+            clipboard.setPrimaryClip(clip);
+            MyApp.showMassage(getContext(), "Copied...");
         }
     }
 
@@ -507,6 +583,13 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
     }
 
     private void setupViews() {
+        txt_copy_code = findViewById(R.id.txt_copy_code);
+        setTouchNClick(R.id.txt_copy_code);
+        txt_copy_code.setText(currentRoomId);
+        if (isMine) {
+            txt_copy_code.setVisibility(View.VISIBLE);
+        }
+
         switch_location_on_off = findViewById(R.id.switch_location_on_off);
         txt_delete_group = findViewById(R.id.txt_delete_group);
         rl_location = findViewById(R.id.rl_location);
@@ -518,6 +601,17 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
                 MyApp.getDisplayHeight()));
         ImageView transparentImageView = findViewById(R.id.transparent_image);
         setTouchNClick(R.id.txt_leave_group);
+        btn_share_room = findViewById(R.id.btn_share_room);
+        if (isMine)
+            btn_share_room.setImageResource(R.drawable.ic_menu_share);
+        else {
+            if (MyApp.getStatus(AppConstants.IS_GUEST)) {
+                btn_share_room.setVisibility(View.GONE);
+            }
+            btn_share_room.setImageResource(R.drawable.ic_bookmark);
+        }
+
+
         setTouchNClick(R.id.btn_share_room);
         rv_list = findViewById(R.id.rv_list);
         rv_list.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -578,6 +672,57 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
+        mMap.getUiSettings().setZoomGesturesEnabled(true);
+        mMap.getUiSettings().setMyLocationButtonEnabled(true);
+
+        mMap.setOnMyLocationChangeListener(new GoogleMap.OnMyLocationChangeListener() {
+            @Override
+            public void onMyLocationChange(Location location) {
+                Log.d("Current map location ", location.getLatitude() + " , " + location.getLongitude());
+                if (myMarker != null) {
+                    myMarker.remove();
+                }
+                if (areMarkersSet) {
+                    return;
+                }
+                sourceLocation = location;
+                setupUsersMarker(location, users);
+                areMarkersSet = true;
+                if (isMine) {
+                    db.collection("allRooms").document(currentRoomId)
+                            .update("lat", location.getLatitude())
+                            .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                @Override
+                                public void onSuccess(Void aVoid) {
+                                }
+                            });
+                    db.collection("allRooms").document(currentRoomId)
+                            .update("lng", location.getLongitude())
+                            .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                @Override
+                                public void onSuccess(Void aVoid) {
+                                }
+                            });
+                } else {
+                    db.collection("allRooms").document(currentRoomId).collection("Users")
+                            .document(MyApp.getSharedPrefString(AppConstants.USER_ID))
+                            .update("lat", location.getLatitude())
+                            .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                @Override
+                                public void onSuccess(Void aVoid) {
+                                }
+                            });
+                    db.collection("allRooms").document(currentRoomId).collection("Users")
+                            .document(MyApp.getSharedPrefString(AppConstants.USER_ID))
+                            .update("lng", location.getLongitude())
+                            .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                @Override
+                                public void onSuccess(Void aVoid) {
+                                }
+                            });
+                }
+            }
+        });
 
         // Add a marker in Sydney and move the camera
     }
@@ -670,19 +815,26 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
     };
 
     private Handler h = new Handler();
+    private Marker myMarker = null;
+    private List<Marker> markers = new ArrayList<>();
+    private Map<String, Marker> markerMap = new HashMap<>();
 
     public void setupUsersMarker(Location myLocation, List<Users> users) {
         if (areMarkersSet) {
             return;
         }
-
-        mMap.clear();
-        mMap.addMarker(new MarkerOptions().position(new LatLng(
-                myLocation.getLatitude(),
-                myLocation.getLongitude()))
-                .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_user_marker)));
+        if (lastUserPath != null) {
+            String url = getMapsApiDirectionsUrl(new LatLng(sourceLocation.getLatitude(), sourceLocation.getLongitude()),
+                    new LatLng(lastUserPath.getLat(), lastUserPath.getLng()));
+            new ReadTask().execute(new String[]{url});
+        }
+//        mMap.clear();
+//        myMarker = mMap.addMarker(new MarkerOptions().position(new LatLng(
+//                myLocation.getLatitude(),
+//                myLocation.getLongitude()))
+//                .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_user_marker)));
         if (this.mMap != null) {
-            this.mMap.getUiSettings().setZoomControlsEnabled(false);
+            this.mMap.getUiSettings().setZoomControlsEnabled(true);
             CameraPosition cameraPosition = new CameraPosition.Builder().target(new LatLng(myLocation.getLatitude(),
                     myLocation.getLongitude())).zoom(15.5f).tilt(0.0f).build();
             if (ContextCompat.checkSelfPermission(this, "android.permission.ACCESS_FINE_LOCATION") == 0 || ContextCompat.checkSelfPermission(this, "android.permission.ACCESS_COARSE_LOCATION") == 0) {
@@ -690,7 +842,7 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
             } else {
                 ActivityCompat.requestPermissions(this, new String[]{"android.permission.ACCESS_FINE_LOCATION", "android.permission.ACCESS_COARSE_LOCATION"}, 1010);
             }
-            this.mMap.getUiSettings().setMyLocationButtonEnabled(true);
+            this.mMap.getUiSettings().setMyLocationButtonEnabled(false);
             this.mMap.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
         }
 
@@ -698,31 +850,42 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
         builder.include(new LatLng(this.sourceLocation.getLatitude(), this.sourceLocation.getLongitude()));
         //This is to generate 10 random points
         for (int i = 0; i < users.size(); i++) {
-            double x0 = myLocation.getLatitude();
-            double y0 = myLocation.getLongitude();
-            Random random = new Random();
-
-            // Convert radius from meters to degrees
-            double radiusInDegrees = 50 / 111000f;
-
-            double u = random.nextDouble();
-            double v = random.nextDouble();
-            double w = radiusInDegrees * Math.sqrt(u);
-            double t = 2 * Math.PI * v;
-            double x = w * Math.cos(t);
-            double y = w * Math.sin(t);
-            // Adjust the x-coordinate for the shrinking of the east-west distances
-            double new_x = x / Math.cos(y0);
-
-            double foundLatitude = new_x + users.get(i).getLat();
-            double foundLongitude = y + users.get(i).getLng();
+//            double x0 = myLocation.getLatitude();
+//            double y0 = myLocation.getLongitude();
+//            Random random = new Random();
+//
+//            // Convert radius from meters to degrees
+//            double radiusInDegrees = 50 / 111000f;
+//
+//            double u = random.nextDouble();
+//            double v = random.nextDouble();
+//            double w = radiusInDegrees * Math.sqrt(u);
+//            double t = 2 * Math.PI * v;
+//            double x = w * Math.cos(t);
+//            double y = w * Math.sin(t);
+//            // Adjust the x-coordinate for the shrinking of the east-west distances
+//            double new_x = x / Math.cos(y0);
+//
+//            double foundLatitude = new_x + users.get(i).getLat();
+//            double foundLongitude = y + users.get(i).getLng();
 
             Log.d(TAG, users.get(i).getLat() + " & " + users.get(i).getLng());
-            builder.include(this.mMap.addMarker(new MarkerOptions().position(new LatLng(
-                    foundLatitude,
-                    foundLongitude)).title(users.get(i).getName())
-                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_marker)))
-                    .getPosition());
+            if (!markerMap.containsKey(users.get(i).getUserId())) {
+                markerMap.put(users.get(i).getUserId(), mMap.addMarker(new MarkerOptions().position(new LatLng(
+                        users.get(i).getLat(),
+                        users.get(i).getLng())).title(users.get(i).getName())
+                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_marker))));
+            } else {
+                Marker m = markerMap.get(users.get(i).getUserId());
+                m.setPosition(new LatLng(users.get(i).getLat(), users.get(i).getLng()));
+            }
+
+
+//            markers.add(mMap.addMarker(new MarkerOptions().position(new LatLng(
+//                    users.get(i).getLat(),
+//                    users.get(i).getLng())).title(users.get(i).getName())
+//                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_marker))));
+            builder.include(new LatLng(users.get(i).getLat(), users.get(i).getLng()));
         }
         CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(adjustBoundsForMaxZoomLevel(builder.build()), 50);
         //Get nearest point to the centre
@@ -758,9 +921,48 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
 
     @Override
     public void handleNewLocation(Location location) {
+        if (myMarker != null) {
+            myMarker.remove();
+        }
+        Log.d("Current location ", location.getLatitude() + " , " + location.getLongitude());
         sourceLocation = location;
         setupUsersMarker(location, users);
         areMarkersSet = true;
+        if (isMine) {
+            db.collection("allRooms").document(currentRoomId)
+                    .update("lat", sourceLocation.getLatitude())
+                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                        @Override
+                        public void onSuccess(Void aVoid) {
+                        }
+                    });
+            db.collection("allRooms").document(currentRoomId)
+                    .update("lng", sourceLocation.getLongitude())
+                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                        @Override
+                        public void onSuccess(Void aVoid) {
+                        }
+                    });
+        } else {
+            db.collection("allRooms").document(currentRoomId).collection("Users")
+                    .document(MyApp.getSharedPrefString(AppConstants.USER_ID))
+                    .update("lat", sourceLocation.getLatitude())
+                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                        @Override
+                        public void onSuccess(Void aVoid) {
+                        }
+                    });
+            db.collection("allRooms").document(currentRoomId).collection("Users")
+                    .document(MyApp.getSharedPrefString(AppConstants.USER_ID))
+                    .update("lng", sourceLocation.getLongitude())
+                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                        @Override
+                        public void onSuccess(Void aVoid) {
+                        }
+                    });
+        }
+
+
     }
 
     @Override
@@ -839,7 +1041,23 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
         view.startAnimation(animate);
     }
 
+    private Users lastUserPath = null;
+
     public void goToUser(Users users) {
+        MyApp.showMassage(getContext(), "Drawing route");
+        lastUserPath = users;
+        String url = getMapsApiDirectionsUrl(new LatLng(sourceLocation.getLatitude(), sourceLocation.getLongitude()),
+                new LatLng(users.getLat(), users.getLng()));
+        new ReadTask().execute(new String[]{url});
+
+//        Intent intent = new Intent(android.content.Intent.ACTION_VIEW,
+//                Uri.parse("geo:0,0?q=" + users.getLat() + "," + users.getLng() + " (" + users.getName() + ")"));
+//        startActivity(intent);
+    }
+
+
+    public void goToGoogleMap(Users users) {
+
         Intent intent = new Intent(android.content.Intent.ACTION_VIEW,
                 Uri.parse("geo:0,0?q=" + users.getLat() + "," + users.getLng() + " (" + users.getName() + ")"));
         startActivity(intent);
@@ -876,5 +1094,216 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
         void updateSave(boolean isSaved);
 
         void updateRemoved(boolean isRemoved);
+    }
+
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (MyApp.getStatus(AppConstants.IS_GUEST)) {
+            db.collection("allRooms").document(currentRoomId).delete().addOnSuccessListener(new OnSuccessListener<Void>() {
+                @Override
+                public void onSuccess(Void aVoid) {
+                }
+            });
+        } else {
+
+        }
+    }
+
+    private String getMapsApiDirectionsUrl(LatLng origin, LatLng dest) {
+
+        String str_origin = "origin=" + origin.latitude + "," + origin.longitude;
+        return "https://maps.googleapis.com/maps/api/directions/" + "json" + "?" +
+                (str_origin + "&" + ("destination=" + dest.latitude + "," + dest.longitude) + "&" + "sensor=false");
+    }
+
+    private class ReadTask extends AsyncTask<String, Void, String> {
+        private ReadTask() {
+        }
+
+        protected String doInBackground(String... url) {
+            String data = "";
+            try {
+                data = new MapHttpConnection().readUr(url[0]);
+            } catch (Exception e) {
+                Log.d("Background Task", e.toString());
+            }
+            return data;
+        }
+
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+            new ParserTask().execute(new String[]{result});
+        }
+    }
+
+    public class MapHttpConnection {
+        public String readUr(String mapsApiDirectionsUrl) throws IOException {
+            String data = "";
+            InputStream istream = null;
+            HttpURLConnection urlConnection = null;
+            try {
+                urlConnection = (HttpURLConnection) new URL(mapsApiDirectionsUrl).openConnection();
+                urlConnection.connect();
+                istream = urlConnection.getInputStream();
+                BufferedReader br = new BufferedReader(new InputStreamReader(istream));
+                StringBuffer sb = new StringBuffer();
+                String str = "";
+                while (true) {
+                    str = br.readLine();
+                    if (str == null) {
+                        break;
+                    }
+                    sb.append(str);
+                }
+                data = sb.toString();
+                br.close();
+            } catch (Exception e) {
+                Log.d("Exception url", e.toString());
+            } finally {
+                istream.close();
+                urlConnection.disconnect();
+            }
+            return data;
+        }
+    }
+
+    private class ParserTask extends AsyncTask<String, Integer, List<List<HashMap<String, String>>>> {
+        private ParserTask() {
+        }
+
+        protected List<List<HashMap<String, String>>> doInBackground(String... jsonData) {
+            List<List<HashMap<String, String>>> routes = null;
+            try {
+                routes = new PathJSONParser().parse(new JSONObject(jsonData[0]));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return routes;
+        }
+
+        protected void onPostExecute(List<List<HashMap<String, String>>> routes) {
+            if (polyline != null) {
+                polyline.remove();
+            }
+
+
+            PolylineOptions polyLineOptions = null;
+            for (int i = 0; i < routes.size(); i++) {
+                ArrayList<LatLng> points = new ArrayList();
+                polyLineOptions = new PolylineOptions();
+                List<HashMap<String, String>> path = (List) routes.get(i);
+                for (int j = 0; j < path.size(); j++) {
+                    HashMap<String, String> point = (HashMap) path.get(j);
+                    if (j == 0) {
+                    } else if (j == 1) {
+                    } else {
+                        points.add(new LatLng(Double.parseDouble(point.get("lat")), Double.parseDouble((String) point.get("lng"))));
+                    }
+                }
+                polyLineOptions.addAll(points);
+                polyLineOptions.width(10.0f);
+                polyLineOptions.color(Color.parseColor("#156CB3"));
+            }
+
+            if (removedLine != null) {
+                removedLine.remove();
+            }
+            try {
+
+                polyline = mMap.addPolyline(polyLineOptions);
+                removedPolyLine = polyLineOptions;
+            } catch (Exception e) {
+                if (removedPolyLine != null) {
+                    removedLine = mMap.addPolyline(removedPolyLine);
+                }
+//                MyApp.showMassage(getContext(), "Path is too short to draw");
+            }
+        }
+    }
+
+    private PolylineOptions removedPolyLine = null;
+    private Polyline polyline = null;
+    private Polyline removedLine = null;
+
+    public class PathJSONParser {
+        public List<List<HashMap<String, String>>> parse(JSONObject jObject) {
+            List<List<HashMap<String, String>>> routes = new ArrayList();
+            try {
+                JSONArray jRoutes = jObject.getJSONArray("routes");
+                for (int i = 0; i < jRoutes.length(); i++) {
+                    JSONArray jLegs = ((JSONObject) jRoutes.get(i)).getJSONArray("legs");
+                    List<HashMap<String, String>> path = new ArrayList();
+                    for (int j = 0; j < jLegs.length(); j++) {
+                        JSONObject jDistance = ((JSONObject) jLegs.get(j)).getJSONObject("distance");
+                        HashMap<String, String> hmDistance = new HashMap();
+                        hmDistance.put("distance", jDistance.getString("text"));
+                        JSONObject jDuration = ((JSONObject) jLegs.get(j)).getJSONObject("duration");
+                        HashMap<String, String> hmDuration = new HashMap();
+                        hmDuration.put("duration", jDuration.getString("text"));
+                        path.add(hmDistance);
+                        path.add(hmDuration);
+                        JSONArray jSteps = ((JSONObject) jLegs.get(j)).getJSONArray("steps");
+                        for (int k = 0; k < jSteps.length(); k++) {
+                            String polyline = "";
+                            List<LatLng> list = decodePoly((String) ((JSONObject) ((JSONObject) jSteps.get(k)).get("polyline")).get("points"));
+                            for (int l = 0; l < list.size(); l++) {
+                                HashMap<String, String> hm = new HashMap();
+                                hm.put("lat", Double.toString((list.get(l)).latitude));
+                                hm.put("lng", Double.toString((list.get(l)).longitude));
+                                path.add(hm);
+                            }
+                        }
+                        routes.add(path);
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            return routes;
+        }
+
+        private List<LatLng> decodePoly(String encoded) {
+            List<LatLng> poly = new ArrayList();
+            int index = 0;
+            int len = encoded.length();
+            int lat = 0;
+            int lng = 0;
+            while (index < len) {
+                int index2;
+                int shift = 0;
+                int result = 0;
+                int b = 0;
+                while (true) {
+                    index2 = index + 1;
+                    b = encoded.charAt(index) - 63;
+                    result |= (b & 31) << shift;
+                    shift += 5;
+                    if (b < 32) {
+                        break;
+                    }
+                    index = index2;
+                }
+                lat += (result & 1) != 0 ? (result >> 1) ^ -1 : result >> 1;
+                shift = 0;
+                result = 0;
+                index = index2;
+                while (true) {
+                    index2 = index + 1;
+                    b = encoded.charAt(index) - 63;
+                    result |= (b & 31) << shift;
+                    shift += 5;
+                    if (b < 32) {
+                        break;
+                    }
+                    index = index2;
+                }
+                lng += (result & 1) != 0 ? (result >> 1) ^ -1 : result >> 1;
+                poly.add(new LatLng(((double) lat) / 100000.0d, ((double) lng) / 100000.0d));
+                index = index2;
+            }
+            return poly;
+        }
     }
 }

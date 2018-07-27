@@ -159,10 +159,10 @@ public class SocialLoginActivity extends CustomActivity {
                                             } catch (MalformedURLException e) {
                                                 e.printStackTrace();
                                             }
-                                            String name = object.getString("name");
-                                            String email = object.getString("email");
-                                            String gender = object.getString("gender");
-                                            String birthday = object.getString("birthday");
+//                                            String name = object.getString("name");
+//                                            String email = object.getString("email");
+//                                            String gender = object.getString("gender");
+//                                            String birthday = object.getString("birthday");
                                         } catch (JSONException e) {
                                             e.printStackTrace();
                                         }
@@ -249,13 +249,14 @@ public class SocialLoginActivity extends CustomActivity {
 
     private void firebaseAuthWithGoogle(GoogleSignInAccount acct) {
         Log.d(TAG, "firebaseAuthWithGoogle:" + acct.getId());
-
+        MyApp.spinnerStart(getContext(), "Logging you in...");
         AuthCredential credential = GoogleAuthProvider.getCredential(acct.getIdToken(), null);
         mAuth.signInWithCredential(credential)
                 .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
                     @Override
                     public void onComplete(@NonNull Task<AuthResult> task) {
                         if (task.isSuccessful()) {
+
                             // Sign in success, update UI with the signed-in user's information
                             Log.d(TAG, "signInWithCredential:success");
 
@@ -275,6 +276,7 @@ public class SocialLoginActivity extends CustomActivity {
                                         @Override
                                         public void onSuccess(Void aVoid) {
 //                                            Log.d(TAG, "DocumentSnapshot added with ID: " + documentReference.getId());
+                                            MyApp.spinnerStop();
                                             MyApp.setStatus(AppConstants.IS_LOGIN, true);
                                             startActivity(new Intent(getContext(), DrawerActivity.class));
                                             finish();
@@ -343,18 +345,41 @@ public class SocialLoginActivity extends CustomActivity {
                             // Sign in success, update UI with the signed-in user's information
                             Log.d(TAG, "signInWithCredential:success");
                             FirebaseUser user = mAuth.getCurrentUser();
+                            MyApp.setSharedPrefString(AppConstants.USER_ID, sDeviceId);
+                            MyApp.setSharedPrefString(AppConstants.USER_NAME, user.getDisplayName());
+
+                            // Create a new user with a first and last name
+                            Map<String, Object> userMap = new HashMap<>();
+                            userMap.put("name", user.getDisplayName());
+                            userMap.put("email", user.getEmail());
+                            userMap.put("userId", user.getUid());
+
+                            db.collection("users").document(sDeviceId)
+                                    .set(userMap)
+                                    .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                        @Override
+                                        public void onSuccess(Void aVoid) {
+//                                            Log.d(TAG, "DocumentSnapshot added with ID: " + documentReference.getId());
+                                            MyApp.setStatus(AppConstants.IS_LOGIN, true);
+                                            startActivity(new Intent(getContext(), DrawerActivity.class));
+                                            finish();
+                                        }
+                                    })
+                                    .addOnFailureListener(new OnFailureListener() {
+                                        @Override
+                                        public void onFailure(@NonNull Exception e) {
+                                            Log.w(TAG, "Error adding document", e);
+                                            MyApp.showMassage(getContext(), "Some error occurred");
+                                        }
+                                    });
+
+
 //                            updateUI(user);
                         } else {
                             // If sign in fails, display a message to the user.
                             Log.w(TAG, "signInWithCredential:failure", task.getException());
-//                            Toast.makeText(FacebookLoginActivity.this, "Authentication failed.",
-//                                    Toast.LENGTH_SHORT).show();
 //                            updateUI(null);
                         }
-
-                        // [START_EXCLUDE]
-                        MyApp.spinnerStop();
-                        // [END_EXCLUDE]
                     }
                 });
     }

@@ -16,11 +16,14 @@ import com.google.android.gms.tasks.OnSuccessListener;
 import com.syla.MainActivity;
 import com.syla.MyRoomsActivity;
 import com.syla.R;
+import com.syla.SavedRoomsActivity;
 import com.syla.application.AppConstants;
 import com.syla.application.MyApp;
 import com.syla.models.Rooms;
 
 import java.util.List;
+
+import static com.syla.application.AppConstants.USER_ID;
 
 /**
  * Created by Abhishek on 22-04-2017.
@@ -77,25 +80,48 @@ public class RoomsAdapter extends RecyclerView.Adapter<RoomsAdapter.MyViewHolder
             btn_delete.setOnClickListener(this);
             itemView.setOnClickListener(this);
             btn_share.setOnClickListener(this);
+            if (!isMine)
+                btn_share.setVisibility(View.INVISIBLE);
         }
 
         @Override
         public void onClick(View v) {
             if (v == btn_delete) {
-                ((MyRoomsActivity) context).db.collection("allRooms").document(data.get(getLayoutPosition()).getRoomId())
-                        .delete().addOnSuccessListener(new OnSuccessListener<Void>() {
-                                                           @Override
-                                                           public void onSuccess(Void aVoid) {
-                                                               data.remove(getLayoutPosition());
-                                                               notifyDataSetChanged();
+                MyApp.spinnerStart(context,"Deleting...");
+                if (isMine) {
+                    ((MyRoomsActivity) context).db.collection("allRooms").document(data.get(getLayoutPosition()).getRoomId())
+                            .delete().addOnSuccessListener(new OnSuccessListener<Void>() {
+                                                               @Override
+                                                               public void onSuccess(Void aVoid) {
+                                                                   data.remove(getLayoutPosition());
+                                                                   notifyDataSetChanged();
+                                                                   MyApp.spinnerStop();
+                                                               }
                                                            }
-                                                       }
-                ).addOnFailureListener(new OnFailureListener() {
-                    @Override
-                    public void onFailure(@NonNull Exception e) {
-                        Log.d("Logging","Failed..."+e.getMessage());
-                    }
-                });
+                    ).addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            MyApp.spinnerStop();
+                            Log.d("Logging", "Failed..." + e.getMessage());
+                        }
+                    });
+                } else {
+                    ((SavedRoomsActivity)context).db.collection("users").document(MyApp.getSharedPrefString(USER_ID))
+                    .collection("savedRooms").document(data.get(getLayoutPosition()).getRoomId())
+                            .delete().addOnFailureListener(new OnFailureListener() {
+                        @Override
+                        public void onFailure(@NonNull Exception e) {
+                            MyApp.spinnerStop();
+                        }
+                    }).addOnSuccessListener(new OnSuccessListener<Void>() {
+                        @Override
+                        public void onSuccess(Void aVoid) {
+                            data.remove(getLayoutPosition());
+                            notifyDataSetChanged();
+                            MyApp.spinnerStop();
+                        }
+                    });
+                }
             } else if (v == itemView) {
                 MyApp.setSharedPrefString(AppConstants.CURRENT_ROOM_ID, data.get(getLayoutPosition()).getRoomId());
                 context.startActivity(new Intent(context, MainActivity.class).putExtra("isMine", isMine));

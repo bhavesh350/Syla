@@ -17,6 +17,7 @@ import android.view.WindowManager;
 
 import com.syla.application.MyApp;
 
+import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
@@ -53,6 +54,12 @@ public class SplashActivity extends AppCompatActivity {
         }, 2500);
 
         printHashKey();
+//        String value = "3ZVecon5hIefL5DVmzBW";
+//        try {
+//            Log.d("encode-decode", new String(MyApp.encode(value, 6), "UTF-8"));
+//        } catch (UnsupportedEncodingException e) {
+//            e.printStackTrace();
+//        }
     }
 
     public void printHashKey() {

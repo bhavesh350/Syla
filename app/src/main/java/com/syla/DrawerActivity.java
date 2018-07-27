@@ -32,6 +32,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnCompleteListener;
@@ -52,6 +53,7 @@ import com.syla.utils.LocationProvider;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 import static com.syla.application.AppConstants.IS_GUEST;
 
@@ -63,6 +65,8 @@ public class DrawerActivity extends CustomActivity
     private FirebaseFirestore db = FirebaseFirestore.getInstance();
     private FirebaseAuth mAuth;
     private LocationProvider provider;
+    private LinearLayout ll_bottom;
+    private String documentId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -112,12 +116,20 @@ public class DrawerActivity extends CustomActivity
             nav_Menu.findItem(R.id.nav_saved_rooms).setVisible(false);
             nav_Menu.findItem(R.id.nav_logout).setTitle("Login");
         }
+
     }
 
+    @Override
+    protected void onResume() {
+        super.onResume();
+        documentId = generatePassword();
+        Log.d("DocumentId", documentId);
+    }
 
     private void setupViews() {
         btn_create_room = findViewById(R.id.btn_create_room);
         btn_join_room = findViewById(R.id.btn_join_room);
+        ll_bottom = findViewById(R.id.ll_bottom);
 
         setTouchNClick(R.id.btn_join_room);
         setTouchNClick(R.id.btn_create_room);
@@ -128,7 +140,7 @@ public class DrawerActivity extends CustomActivity
         super.onClick(v);
         if (!MyApp.isLocationEnabled(DrawerActivity.this)) {
             AlertDialog.Builder b = new AlertDialog.Builder(getContext());
-            b.setMessage("To access BLE device please enable GPS");
+            b.setMessage("Your location is off, please turn it ON to continue.");
             b.setTitle("Enable GPS");
             b.setPositiveButton("Enable", new DialogInterface.OnClickListener() {
                 @Override
@@ -143,6 +155,8 @@ public class DrawerActivity extends CustomActivity
             joinRoomDialog();
         } else if (v == btn_create_room) {
             createRoomDialog();
+        } else if (v == ll_bottom) {
+            return;
         }
     }
 
@@ -182,6 +196,7 @@ public class DrawerActivity extends CustomActivity
                 room.put("roomName", edt_room_name.getText().toString());
                 room.put("userName", edt_user_name.getText().toString());
                 room.put("isLeft", false);
+                room.put("isActive", true);
                 room.put("userId", MyApp.getSharedPrefString(AppConstants.USER_ID));
                 room.put("createTime", System.currentTimeMillis());
                 try {
@@ -191,12 +206,12 @@ public class DrawerActivity extends CustomActivity
                     room.put("lat", 0.0);
                     room.put("lng", 0.0);
                 }
-                db.collection("allRooms").add(room)
-                        .addOnSuccessListener(new OnSuccessListener<DocumentReference>() {
+                db.collection("allRooms").document(documentId).set(room)
+                        .addOnSuccessListener(new OnSuccessListener<Void>() {
                             @Override
-                            public void onSuccess(DocumentReference documentReference) {
+                            public void onSuccess(Void aVoid) {
                                 MyApp.spinnerStop();
-                                String id = documentReference.getId();
+                                String id = documentId;
                                 MyApp.setSharedPrefString(AppConstants.CURRENT_ROOM_ID, id);
                                 startActivity(new Intent(getContext(), MainActivity.class).putExtra("isNew", true)
                                         .putExtra("isMine", true));
@@ -243,7 +258,12 @@ public class DrawerActivity extends CustomActivity
         btn_come_in.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
+                if (edt_room_link.getText().toString().isEmpty()) {
+                    return;
+                }
+                if (edt_user_name.getText().toString().isEmpty()) {
+                    return;
+                }
                 CollectionReference user = db.collection("allRooms").document("tfRmitP92ywSv8ETF2vN").collection("Users");
                 user.get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override
@@ -374,12 +394,13 @@ public class DrawerActivity extends CustomActivity
         } else if (id == R.id.nav_my_rooms) {
             startActivity(new Intent(getContext(), MyRoomsActivity.class).putExtra("title", "My Rooms"));
         } else if (id == R.id.nav_saved_rooms) {
-            startActivity(new Intent(getContext(), MyRoomsActivity.class).putExtra("title", "Saved Rooms"));
+            startActivity(new Intent(getContext(), SavedRoomsActivity.class).putExtra("title", "Saved Rooms"));
         } else if (id == R.id.nav_logout) {
             try {
                 mAuth.signOut();
             } catch (Exception e) {
             }
+
             MyApp.setStatus(AppConstants.IS_LOGIN, false);
             MyApp.setSharedPrefString(AppConstants.USER_ID, "");
             startActivity(new Intent(getContext(), SocialLoginActivity.class));
@@ -446,5 +467,21 @@ public class DrawerActivity extends CustomActivity
     public void handleManualPermission() {
 
     }
+
+    private String generatePassword() {
+        String password = "";
+        Random random = new Random();
+        String full = "ABCDEFGHIJKLMNOPQRESTUVWXYZabcdefgghiklmnopqrstuvwxyz1234567890";
+        while (password.length() < 7) {
+            int index = random.nextInt(full.length());
+            String buffer = "" + full.charAt(index);
+            password += buffer;
+        }
+
+//        db.collection("allRooms").whereEqualTo(password)
+
+        return password;
+    }
+
 
 }

@@ -22,18 +22,30 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_alignParentRight="true"
+        android:layout_marginRight="5dp"
         android:background="?selectableItemBackgroundBorderless"
-        android:padding="10dp"
-        android:layout_marginRight="10dp"
+        android:padding="5dp"
         android:src="@drawable/ic_direction" />
+
+    <ImageButton
+        android:id="@+id/btn_map"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:layout_marginRight="5dp"
+        android:layout_toLeftOf="@+id/btn_direction"
+        android:background="?selectableItemBackgroundBorderless"
+        android:padding="5dp"
+        android:src="@drawable/ic_map" />
 
     <ImageButton
         android:id="@+id/btn_delete"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_toLeftOf="@+id/btn_direction"
+        android:layout_centerVertical="true"
+        android:layout_marginRight="5dp"
+        android:layout_toLeftOf="@+id/btn_map"
         android:background="?selectableItemBackgroundBorderless"
-        android:padding="10dp"
-        android:layout_marginRight="10dp"
+        android:padding="5dp"
         android:src="@drawable/ic_delete" />
 </RelativeLayout>
