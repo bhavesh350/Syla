@@ -64,26 +64,27 @@
                             android:layout_gravity="center_horizontal"
                             android:src="@drawable/ic_action_drag_handle" />
 
+
                         <Button
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:background="#00000000"/>
+                            android:background="#00000000" />
 
                         <android.support.v7.widget.Toolbar
                             android:id="@+id/toolbar"
                             android:layout_width="match_parent"
                             android:layout_height="?attr/actionBarSize"
+                            android:layout_marginTop="20dp"
                             android:background="@color/colorPrimaryDark"
                             android:visibility="gone"
-                            android:layout_marginTop="20dp"
                             app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
                             app:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar" />
 
                         <RelativeLayout
                             android:id="@+id/rl_location"
-                            android:layout_marginTop="20dp"
                             android:layout_width="match_parent"
-                            android:layout_height="?actionBarSize">
+                            android:layout_height="?actionBarSize"
+                            android:layout_marginTop="40dp">
 
                             <ImageButton
                                 android:id="@+id/btn_share_room"
@@ -119,6 +120,8 @@
                                 android:checked="true"
                                 android:padding="5dp"
                                 android:text="Location  " />
+
+
                         </RelativeLayout>
 
                     </RelativeLayout>
@@ -128,10 +131,21 @@
                         android:layout_width="match_parent"
                         android:layout_height="match_parent">
 
+
+                        <TextView
+                            android:id="@+id/txt_roomName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="5dp"
+                            android:paddingLeft="20dp"
+                            android:text="Room : "
+                            android:textColor="@color/black" />
+
                         <TextView
                             android:id="@+id/txt_group_info"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:layout_below="@+id/txt_roomName"
                             android:gravity="center"
                             android:padding="15dp"
                             android:text="No one has joined the room yet. Share your code to invite people to your room."
@@ -141,7 +155,8 @@
                         <android.support.v7.widget.RecyclerView
                             android:id="@+id/rv_list"
                             android:layout_width="match_parent"
-                            android:layout_height="match_parent"></android.support.v7.widget.RecyclerView>
+                            android:layout_height="match_parent"
+                            android:layout_below="@+id/txt_roomName"></android.support.v7.widget.RecyclerView>
 
                         <Space
                             android:layout_width="match_parent"

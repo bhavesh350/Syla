@@ -59,7 +59,7 @@ public class SavedRoomsActivity extends CustomActivity {
         db.collection("users").document(MyApp.getSharedPrefString(AppConstants.USER_ID)).collection("savedRooms")
                 .get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
             @Override
-            public void onComplete(@NonNull Task<QuerySnapshot> task) {
+            public void onComplete(@NonNull final Task<QuerySnapshot> task) {
                 if (task.getResult().size() == 0) {
                     MyApp.popFinishableMessage("Syla Message", "It seems you are new here, " +
                             "because there is no room created by you yet. Please create them and try again." +
@@ -68,6 +68,7 @@ public class SavedRoomsActivity extends CustomActivity {
                 }
                 if (task.isSuccessful()) {
                     for (int i = 0; i < task.getResult().size(); i++) {
+                        final int position = i;
                         final Rooms r = new Rooms();
 
                         DocumentSnapshot doc = task.getResult().getDocuments().get(i);
@@ -75,27 +76,45 @@ public class SavedRoomsActivity extends CustomActivity {
                                 new OnSuccessListener<DocumentSnapshot>() {
                                     @Override
                                     public void onSuccess(DocumentSnapshot doc) {
-                                        r.setRoomId(doc.getId());
-                                        r.setRoomCreateTime(doc.getLong("createTime"));
-                                        r.setRoomName(doc.getString("roomName"));
+                                        try {
+                                            r.setRoomId(doc.getId());
+                                            r.setRoomCreateTime(doc.getLong("createTime"));
+                                            r.setRoomName(doc.getString("roomName"));
 
-                                        doc.getReference().collection("Users").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                                            @Override
-                                            public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                                                count = task.getResult().size();
-                                                Log.d("Logging", "my room size is " + count);
-                                                r.setCount(count);
-                                                adapter.notifyDataSetChanged();
+                                            doc.getReference().collection("Users").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                                                @Override
+                                                public void onComplete(@NonNull Task<QuerySnapshot> task) {
+                                                    count = task.getResult().size();
+                                                    Log.d("Logging", "my room size is " + count);
+                                                    r.setCount(count);
+                                                    adapter.notifyDataSetChanged();
+                                                }
+                                            }).addOnFailureListener(new OnFailureListener() {
+                                                @Override
+                                                public void onFailure(@NonNull Exception e) {
+                                                    Log.d("Logging", "failed " + e.getMessage());
+                                                }
+                                            });
+                                            r.setCount(count);
+                                            count = 0;
+                                            if (!doc.getBoolean("isLeft"))
+                                                myRooms.add(r);
+                                            Log.d("debug", "position is " + position + " & size check is " + (task.getResult().size() - 1));
+                                            if (position == (task.getResult().size() - 1)) {
+                                                Log.d("debug", "came to true");
+                                                Log.d("debug", "myRoom size is " + myRooms.size());
+                                                if (myRooms.size() == 0) {
+                                                    Log.d("debug", "satya vachan");
+                                                    MyApp.popMessage("Syla", "No room has been saved yet.", getContext());
+                                                }
                                             }
-                                        }).addOnFailureListener(new OnFailureListener() {
-                                            @Override
-                                            public void onFailure(@NonNull Exception e) {
-                                                Log.d("Logging", "failed " + e.getMessage());
+                                        } catch (Exception e) {
+                                            if (myRooms.size() == 0) {
+                                                MyApp.popFinishableMessage("Syla",
+                                                        "No room has been saved yet.", SavedRoomsActivity.this);
                                             }
-                                        });
-                                        r.setCount(count);
-                                        count = 0;
-                                        myRooms.add(r);
+                                            e.printStackTrace();
+                                        }
                                     }
                                 }
                         ).addOnFailureListener(new OnFailureListener() {
@@ -110,6 +129,10 @@ public class SavedRoomsActivity extends CustomActivity {
                     adapter = new RoomsAdapter(getContext(), myRooms, false);
                     rv_list.setAdapter(adapter);
                     MyApp.spinnerStop();
+
+//                    if (myRooms.size() == 0) {
+//                        MyApp.popFinishableMessage("Syla Message", "You do not have any saved room yet.", SavedRoomsActivity.this);
+//                    }
                 } else {
                     MyApp.spinnerStop();
                 }

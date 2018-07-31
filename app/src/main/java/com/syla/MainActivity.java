@@ -10,8 +10,8 @@ import android.content.Intent;
 import android.content.IntentSender;
 import android.graphics.Color;
 import android.location.Location;
+import android.media.MediaPlayer;
 import android.net.Uri;
-import android.nfc.Tag;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
@@ -50,7 +50,6 @@ import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.location.LocationSettingsRequest;
 import com.google.android.gms.location.LocationSettingsResult;
 import com.google.android.gms.location.LocationSettingsStatusCodes;
-import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapFragment;
@@ -64,7 +63,6 @@ import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.firebase.firestore.DocumentReference;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.EventListener;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -90,7 +88,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 
 public class MainActivity extends CustomActivity implements OnMapReadyCallback,
         ObservableScrollView.OnScrollChangedListener, LocationProvider.LocationCallback, LocationProvider.PermissionCallback {
@@ -117,6 +114,9 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
     private TextView txt_group_info;
     private TextView txt_copy_code;
     private ImageButton btn_share_room;
+    private TextView txt_roomName;
+    private Map<String, String> joinMap = new HashMap<>();
+    private boolean isFirstDataSetupDone = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -155,32 +155,32 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
         mScrollView.setOnScrollChangedListener(this);
         setupViews();
 
-        if (isNewRoom) {
-            AlertDialog.Builder b = new AlertDialog.Builder(getContext());
-            b.setTitle("Invite People").setMessage("You have created a new room, you can share the room id to" +
-                    " other people to join you.")
-                    .setPositiveButton("Share Now", new DialogInterface.OnClickListener() {
-                        @Override
-                        public void onClick(DialogInterface dialog, int which) {
-                            String link_val = currentRoomId;
-                            String body = "Hi, I have created a room to share our location, so that we can track each other anytime" +
-                                    "\n'" + link_val
-                                    + "' is the room id you have to enter to join it.";
-//                            String shareBody = "Hi, I have created a room to share our location, so that we can track each other anytime" +
-//                                    "\n'" + currentRoomId + "' is the room id you have to enter to join it.";
-                            Intent sharingIntent = new Intent(android.content.Intent.ACTION_SEND);
-                            sharingIntent.setType("text/plain");
-                            sharingIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, "Join Room");
-                            sharingIntent.putExtra(android.content.Intent.EXTRA_TEXT, body);
-                            startActivity(Intent.createChooser(sharingIntent, "Share Via"));
-                        }
-                    }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                @Override
-                public void onClick(DialogInterface dialog, int which) {
-
-                }
-            }).create().show();
-        }
+//        if (isNewRoom) {
+//            AlertDialog.Builder b = new AlertDialog.Builder(getContext());
+//            b.setTitle("Invite People").setMessage("You have created a new room, you can share the room id to" +
+//                    " other people to join you.")
+//                    .setPositiveButton("Share Now", new DialogInterface.OnClickListener() {
+//                        @Override
+//                        public void onClick(DialogInterface dialog, int which) {
+//                            String link_val = currentRoomId;
+//                            String body = "Hi, I have created a room to share our location, so that we can track each other anytime" +
+//                                    "\n'" + link_val
+//                                    + "' is the room id you have to enter to join it.";
+////                            String shareBody = "Hi, I have created a room to share our location, so that we can track each other anytime" +
+////                                    "\n'" + currentRoomId + "' is the room id you have to enter to join it.";
+//                            Intent sharingIntent = new Intent(android.content.Intent.ACTION_SEND);
+//                            sharingIntent.setType("text/plain");
+//                            sharingIntent.putExtra(android.content.Intent.EXTRA_SUBJECT, "Join Room");
+//                            sharingIntent.putExtra(android.content.Intent.EXTRA_TEXT, body);
+//                            startActivity(Intent.createChooser(sharingIntent, "Share Via"));
+//                        }
+//                    }).setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+//                @Override
+//                public void onClick(DialogInterface dialog, int which) {
+//
+//                }
+//            }).create().show();
+//        }
 
         // get all data for the room
         db.collection("allRooms").document(currentRoomId).addSnapshotListener(new EventListener<DocumentSnapshot>() {
@@ -194,6 +194,7 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
                     Log.d("Firestore Demo", "Current data: " + snapshot.getData());
                     String roomName1 = snapshot.getString("roomName");
                     toolbar.setTitle(roomName1);
+                    txt_roomName.setText("Room : " + roomName1);
                     if (isMine) {
 
                     } else {
@@ -201,7 +202,7 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
                             return;
                         }
                         admin = new Users();
-                        admin.setActive(true);
+                        admin.setActive(snapshot.getBoolean("isActive"));
                         try {
                             admin.setLat(snapshot.getDouble("lat"));
                             admin.setLng(snapshot.getDouble("lng"));
@@ -229,12 +230,20 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
                                         Log.d(TAG, "onSuccess: DOCUMENT" + documentSnapshot.getId()
                                                 + " ; " + documentSnapshot.getData());
                                         Users u = documentSnapshot.toObject(Users.class);
+                                        try {
+                                            if (u.getLng() == 0) {
+                                                u.setLat(sourceLocation.getLatitude());
+                                                u.setLng(sourceLocation.getLongitude());
+                                            }
+                                        } catch (Exception ef) {
+                                        }
                                         if (!u.getUserId().equals(MyApp.getSharedPrefString(AppConstants.USER_ID))) {
                                             if (!u.isRemoved()) {
                                                 users.add(u);
                                             } else {
-                                                MyApp.popMessage("Alert", u.getName() + " has been left the room", getContext());
+
                                                 if (users.size() > 1) {
+                                                    MyApp.popMessage("Alert", u.getName() + " has been left the room", getContext());
                                                     db.collection("allRooms").document(currentRoomId).collection("Users")
                                                             .document(u.getUserId())
                                                             .delete()
@@ -275,8 +284,10 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
                                     setupUsersMarker(sourceLocation, users);
                                 }
 
+
                             } else {
                                 // No users found yet
+                                isFirstDataSetupDone = true;
                                 txt_group_info.setVisibility(View.VISIBLE);
                             }
                         }
@@ -299,7 +310,12 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
             @Override
             public void updateInvisible(final boolean isVisible) {
                 if (isMine) {
+                    db.collection("allRooms").document(currentRoomId).update("isActive", isVisible).addOnSuccessListener(new OnSuccessListener<Void>() {
+                        @Override
+                        public void onSuccess(Void aVoid) {
 
+                        }
+                    });
                 } else {
                     db.collection("allRooms").document(currentRoomId).collection("Users")
                             .document(MyApp.getSharedPrefString(AppConstants.USER_ID))
@@ -412,6 +428,8 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
                                                     Log.d("Firestore Demo", "Current data: " + snapshot.getData());
                                                     String roomName1 = snapshot.getString("roomName");
                                                     toolbar.setTitle(roomName1);
+                                                    txt_roomName.setText("Room : " + toolbar.getTitle().toString());
+                                                    Log.d("debugName", toolbar.getTitle().toString());
                                                     if (isMine) {
 
                                                     } else {
@@ -583,6 +601,7 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
     }
 
     private void setupViews() {
+        txt_roomName = findViewById(R.id.txt_roomName);
         txt_copy_code = findViewById(R.id.txt_copy_code);
         setTouchNClick(R.id.txt_copy_code);
         txt_copy_code.setText(currentRoomId);
@@ -596,7 +615,7 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
         imgContainer = findViewById(R.id.img_container);
         ll_bottom = findViewById(R.id.ll_bottom);
         imgContainer.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                (int) (MyApp.getDisplayHeight() * 0.98)));
+                (int) (MyApp.getDisplayHeight() * 0.88)));
         ll_bottom.setLayoutParams(new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
                 MyApp.getDisplayHeight()));
         ImageView transparentImageView = findViewById(R.id.transparent_image);
@@ -678,13 +697,14 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
         mMap.setOnMyLocationChangeListener(new GoogleMap.OnMyLocationChangeListener() {
             @Override
             public void onMyLocationChange(Location location) {
+                if (areMarkersSet) {
+                    return;
+                }
                 Log.d("Current map location ", location.getLatitude() + " , " + location.getLongitude());
                 if (myMarker != null) {
                     myMarker.remove();
                 }
-                if (areMarkersSet) {
-                    return;
-                }
+
                 sourceLocation = location;
                 setupUsersMarker(location, users);
                 areMarkersSet = true;
@@ -818,6 +838,7 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
     private Marker myMarker = null;
     private List<Marker> markers = new ArrayList<>();
     private Map<String, Marker> markerMap = new HashMap<>();
+    private boolean isMapCentered = false;
 
     public void setupUsersMarker(Location myLocation, List<Users> users) {
         if (areMarkersSet) {
@@ -833,7 +854,7 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
 //                myLocation.getLatitude(),
 //                myLocation.getLongitude()))
 //                .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_user_marker)));
-        if (this.mMap != null) {
+        if (this.mMap != null && !isMapCentered) {
             this.mMap.getUiSettings().setZoomControlsEnabled(true);
             CameraPosition cameraPosition = new CameraPosition.Builder().target(new LatLng(myLocation.getLatitude(),
                     myLocation.getLongitude())).zoom(15.5f).tilt(0.0f).build();
@@ -887,9 +908,13 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
 //                    .icon(BitmapDescriptorFactory.fromResource(R.drawable.ic_marker))));
             builder.include(new LatLng(users.get(i).getLat(), users.get(i).getLng()));
         }
-        CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(adjustBoundsForMaxZoomLevel(builder.build()), 50);
+        if (!isMapCentered) {
+            isMapCentered = true;
+           CameraUpdateFactory.newLatLngBounds(adjustBoundsForMaxZoomLevel(builder.build()), 150);
+            h.postDelayed(updateTask, 5000);
+        }
         //Get nearest point to the centre
-        h.postDelayed(updateTask, 5000);
+
     }
 
     private Context getContext() {
@@ -901,9 +926,10 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
         int scrollY = mScrollView.getScrollY();
         // Add parallax effect
         imgContainer.setTranslationY(scrollY * 0.5f);
-        Log.d("scrolling", mScrollView.getScrollY() + "");
+
         int toolbarOffset = MyApp.getDisplayHeight() - mScrollView.getScrollY();
-        if (toolbarOffset <= 60) {
+        Log.d("scrolling", toolbarOffset + "");
+        if (toolbarOffset <= 240) {
             rl_location.setVisibility(View.GONE);
             toolbar.setVisibility(View.VISIBLE);
 //            slideUp(toolbar);
@@ -915,6 +941,52 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
 //            slideUp(rl_location);
 //            slideDown(toolbar);
         }
+    }
+
+    @Override
+    public void onBackPressed() {
+//        super.onBackPressed();
+        AlertDialog.Builder b = new AlertDialog.Builder(getContext());
+        b.setTitle("Choose option").setMessage("What do you want to do?")
+                .setPositiveButton("Continue in background", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        Intent startMain = new Intent(Intent.ACTION_MAIN);
+                        startMain.addCategory(Intent.CATEGORY_HOME);
+                        startMain.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        startActivity(startMain);
+
+//                        startActivity(new Intent(getContext(), DrawerActivity.class));
+                    }
+                }).setNegativeButton("Leave group", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+
+                if (isMine) {
+                    MyApp.showMassage(getContext(), "Removing you.");
+                    db.collection("allRooms").document(currentRoomId).update("isLeft", true)
+                            .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                @Override
+                                public void onSuccess(Void aVoid) {
+                                    finish();
+                                }
+                            });
+                } else {
+                    MyApp.showMassage(getContext(), "Removing you.");
+                    db.collection("allRooms").document(currentRoomId).collection("Users")
+                            .document(MyApp.getSharedPrefString(AppConstants.USER_ID))
+                            .update("isRemoved", true)
+                            .addOnSuccessListener(new OnSuccessListener<Void>() {
+                                @Override
+                                public void onSuccess(Void aVoid) {
+                                    Log.d(TAG, "You have been removed ");
+                                    finish();
+                                }
+                            });
+                }
+
+            }
+        }).create().show();
     }
 
     private Location sourceLocation = null;
@@ -1006,7 +1078,7 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
         displayBuilder.include(new LatLng(this.sourceLocation.getLatitude()
                 - deltaLat, this.sourceLocation.getLongitude() - deltaLon));
         this.mMap.animateCamera(CameraUpdateFactory.newLatLngBounds(displayBuilder.build(), 100));
-        this.mMap.setMaxZoomPreference(15.5f);
+//        this.mMap.setMaxZoomPreference(15.5f);
         return bounds;
     }
 
@@ -1305,5 +1377,17 @@ public class MainActivity extends CustomActivity implements OnMapReadyCallback,
             }
             return poly;
         }
+    }
+
+    private void playJoiningSound() {
+        MediaPlayer mPlayer = MediaPlayer.create(getContext(), R.raw.room_join);
+        mPlayer.start();
+        mPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion(MediaPlayer mp) {
+                mp.reset();
+                mp.release();
+            }
+        });
     }
 }

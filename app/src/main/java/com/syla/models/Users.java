@@ -10,6 +10,17 @@ public class Users {
     private boolean isActive;
     private boolean isRemoved;
     private boolean isDeleted;
+    private boolean isIgnore;
+
+    @PropertyName(value="isIgnore")
+    public boolean isIgnore() {
+        return isIgnore;
+    }
+
+    @PropertyName(value="isIgnore")
+    public void setIgnore(boolean ignore) {
+        isIgnore = ignore;
+    }
 
     @PropertyName(value="isDeleted")
     public boolean isDeleted() {

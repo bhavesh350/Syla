@@ -77,6 +77,9 @@ public class MyRoomsActivity extends CustomActivity {
                         r.setRoomId(doc.getId());
                         r.setRoomCreateTime(doc.getLong("createTime"));
                         r.setRoomName(doc.getString("roomName"));
+                        r.setUserName(doc.getString("userName"));
+                        r.setLat(doc.getDouble("lat"));
+                        r.setLng(doc.getDouble("lng"));
 
 //                        List<Rooms.Users> user = new ArrayList<>();
                         doc.getReference().collection("Users").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {

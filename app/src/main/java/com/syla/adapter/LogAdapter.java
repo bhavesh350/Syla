@@ -56,7 +56,10 @@ public class LogAdapter extends RecyclerView.Adapter<LogAdapter.MyViewHolder> {
         }
 
         if (u.isAdmin()) {
-            holder.txt_value.setText(u.getName() + " (Admin)");
+            if (u.isActive())
+                holder.txt_value.setText(u.getName() + " (Admin)");
+            else
+                holder.txt_value.setText(u.getName() + " (Admin, Inactive)");
         }
     }
 

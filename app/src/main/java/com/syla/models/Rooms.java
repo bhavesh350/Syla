@@ -9,6 +9,24 @@ public class Rooms {
     private String userName;
     private int count;
     private String roomId;
+    private double lat;
+    private double lng;
+
+    public double getLat() {
+        return lat;
+    }
+
+    public void setLat(double lat) {
+        this.lat = lat;
+    }
+
+    public double getLng() {
+        return lng;
+    }
+
+    public void setLng(double lng) {
+        this.lng = lng;
+    }
 
     public String getRoomId() {
         return roomId;
@@ -18,7 +36,9 @@ public class Rooms {
         this.roomId = roomId;
     }
 
-    public Rooms(){}
+    public Rooms() {
+    }
+
     public int getCount() {
         return count;
     }

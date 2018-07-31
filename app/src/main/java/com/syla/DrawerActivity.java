@@ -264,7 +264,7 @@ public class DrawerActivity extends CustomActivity
                 if (edt_user_name.getText().toString().isEmpty()) {
                     return;
                 }
-                CollectionReference user = db.collection("allRooms").document("tfRmitP92ywSv8ETF2vN").collection("Users");
+                CollectionReference user = db.collection("allRooms").document(edt_room_link.getText().toString()).collection("Users");
                 user.get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
                     @Override
                     public void onComplete(@NonNull Task<QuerySnapshot> task) {
